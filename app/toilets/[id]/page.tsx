@@ -8,7 +8,6 @@ import {
   ThumbsUp, ThumbsDown, Flag, ChevronLeft, Edit, Share2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,14 +15,21 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoadingSpinner } from '@/components/loading-spinner';
-
-import { mockToilets, mockComments } from '@/lib/mockData';
+import { Textarea } from '@/components/ui/textarea';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useToast } from '@/hooks/use-toast';
 import { useGeolocation } from '@/lib/geolocation';
 import { 
   formatDistance, calculateDistance, formatDate, 
   getStatusColor, getFeatureLabel, getFeatureIcon
 } from '@/lib/utils';
 import { Toilet, Comment, ToiletFeature } from '@/lib/types';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/firebase/client';
+
+// Configuration pour les routes dynamiques
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default function ToiletDetailPage() {
   const params = useParams();
@@ -31,19 +37,51 @@ export default function ToiletDetailPage() {
   const [toilet, setToilet] = useState<Toilet | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newComment, setNewComment] = useState('');
+  const [newRating, setNewRating] = useState(5);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuthStore();
+  const { toast } = useToast();
   
-  // Fetch toilet details
+  // Charger la toilette et les commentaires depuis Firestore
   useEffect(() => {
-    // Simulate API call with mock data
-    const id = params.id as string;
-    const foundToilet = mockToilets.find(t => t.id === id);
-    
-    if (foundToilet) {
-      setToilet(foundToilet);
-      setComments(mockComments.filter(c => c.toiletId === id));
-    }
-    
-    setLoading(false);
+    const fetchToilet = async () => {
+      setLoading(true);
+      const id = params.id as string;
+      const docRef = doc(db, "toilets", id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setToilet({
+          id: docSnap.id,
+          ...data,
+          addedAt: data.addedAt?.toDate ? data.addedAt.toDate() : new Date(data.addedAt),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
+        } as Toilet);
+        // Charger les commentaires
+        const commentsRef = collection(db, "comments");
+        const q = query(commentsRef, where("toiletId", "==", id));
+        const querySnapshot = await getDocs(q);
+        const commentsData = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            toiletId: data.toiletId,
+            userId: data.userId,
+            userName: data.userName,
+            userImage: data.userAvatar || data.userImage || '',
+            text: data.content || data.text || '',
+            rating: data.rating,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+          } as Comment;
+        });
+        setComments(commentsData);
+      } else {
+        setToilet(null);
+      }
+      setLoading(false);
+    };
+    fetchToilet();
   }, [params.id]);
   
   if (loading) {
@@ -80,6 +118,83 @@ export default function ToiletDetailPage() {
     free: 'Ticket',
     requires_key: 'Key',
     '24h': 'Clock',
+  };
+  
+  const handleSubmitComment = async () => {
+    if (!user) {
+      toast({
+        title: "Connexion requise",
+        description: "Vous devez être connecté pour laisser un commentaire.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newComment.trim()) {
+      toast({
+        title: "Commentaire requis",
+        description: "Veuillez saisir un commentaire.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const commentsRef = collection(db, "comments");
+      await addDoc(commentsRef, {
+        toiletId: toilet?.id,
+        userId: user.uid,
+        userEmail: user.email,
+        userName: user.displayName || user.email?.split("@")[0] || "Utilisateur",
+        userAvatar: user.photoURL,
+        content: newComment.trim(),
+        rating: newRating,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      const toiletRef = doc(db, "toilets", toilet?.id);
+      await updateDoc(toiletRef, {
+        commentsCount: increment(1),
+      });
+
+      setNewComment("");
+      setNewRating(5);
+
+      toast({
+        title: "Commentaire ajouté",
+        description: "Votre commentaire a été publié avec succès.",
+      });
+
+      // Recharger les commentaires
+      const commentsRefReload = collection(db, "comments");
+      const q = query(commentsRefReload, where("toiletId", "==", toilet?.id));
+      const querySnapshot = await getDocs(q);
+      const commentsData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          toiletId: data.toiletId,
+          userId: data.userId,
+          userName: data.userName,
+          userImage: data.userAvatar || data.userImage || '',
+          text: data.content || data.text || '',
+          rating: data.rating,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+        } as Comment;
+      });
+      setComments(commentsData);
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ajouter le commentaire.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   return (
@@ -211,11 +326,43 @@ export default function ToiletDetailPage() {
         <TabsContent value="reviews" className="space-y-4 mt-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Reviews</h2>
-            <Button>
-              <MessageCircle size={16} className="mr-2" />
-              Add Review
-            </Button>
           </div>
+          
+          {user && (
+            <Card>
+              <CardContent className="pt-6">
+                <h3 className="font-medium mb-4">Ajouter un commentaire</h3>
+                <Textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Partagez votre expérience..."
+                  className="min-h-[100px] mb-3"
+                />
+                <div className="flex items-center gap-4 mb-4">
+                  <span className="font-medium">Note:</span>
+                  <div className="flex-1 flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="5"
+                      step="0.5"
+                      value={newRating}
+                      onChange={(e) => setNewRating(Number(e.target.value))}
+                      className="w-full max-w-xs"
+                    />
+                    <span className="w-10 text-center">{newRating}</span>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleSubmitComment}
+                  disabled={isSubmitting || !newComment.trim()}
+                  className="w-full"
+                >
+                  {isSubmitting ? "Publication..." : "Publier le commentaire"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
           
           {comments.length === 0 ? (
             <div className="text-center py-12 border rounded-lg bg-muted/10">
@@ -231,7 +378,7 @@ export default function ToiletDetailPage() {
                     <div className="flex items-start gap-4">
                       <Avatar>
                         <AvatarImage src={comment.userImage} alt={comment.userName} />
-                        <AvatarFallback>{comment.userName.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>{comment.userName?.charAt(0) || 'A'}</AvatarFallback>
                       </Avatar>
                       
                       <div className="flex-1 space-y-1">

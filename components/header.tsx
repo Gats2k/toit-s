@@ -73,7 +73,7 @@ export function Header() {
       <div className="container max-w-4xl mx-auto flex h-14 items-center px-2 sm:px-4">
         <Link href="/" className="mr-4 flex items-center space-x-2">
           <MapPin className="h-6 w-6" />
-          <span className="font-bold">ToiletFinder</span>
+          <span className="font-bold">Toit&apos;s Map</span>
         </Link>
 
         <nav className="hidden md:flex items-center space-x-4 lg:space-x-6 mx-6">

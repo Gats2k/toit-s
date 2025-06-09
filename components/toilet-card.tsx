@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useAuthState } from "react-firebase-hooks/auth"
 import { useToast } from "@/hooks/use-toast"
-import { Star, MessageSquare, ThumbsUp, ThumbsDown, Check, X, Clock, MapPin, User } from "lucide-react"
+import { Star, MessageSquare, ThumbsUp, ThumbsDown, Check, X, Clock, MapPin, User, ChevronRight } from "lucide-react"
 import { doc, updateDoc, arrayUnion, increment, collection, addDoc } from "firebase/firestore"
 import { useRouter } from "next/navigation"
 
@@ -197,10 +197,11 @@ export function ToiletCard({ toilet, userCoordinates }: ToiletCardProps) {
       <CardFooter className="flex justify-between border-t pt-4">
         <Button 
           variant="outline" 
-          onClick={() => openDialog(toilet.id)}
+          onClick={() => router.push(`/toilets/${toilet.id}`)}
           className="flex items-center gap-1"
         >
-          <MessageSquare className="w-4 h-4" />
+          <ChevronRight className="w-4 h-4" />
+          Voir plus
         </Button>
         <div className="flex gap-2">
           <Button 

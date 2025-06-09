@@ -113,3 +113,11 @@ async function updateToiletRating(toiletId: string) {
     })
   }
 }
+
+export async function deleteComment(commentId: string, toiletId: string) {
+  const commentRef = doc(db, "comments", commentId)
+  await deleteDoc(commentRef)
+  
+  // Update toilet rating after deletion
+  await updateToiletRating(toiletId)
+}

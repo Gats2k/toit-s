@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
-import { Star, Send, MessageSquare, ThumbsUp, ThumbsDown, AlertCircle } from "lucide-react"
+import { Star, Send, MessageSquare, ThumbsUp, ThumbsDown, AlertCircle, Trash2 } from "lucide-react"
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 
 import { useAuthStore } from "@/store/useAuthStore"
 import type { Comment, Like, Toilet } from "@/lib/types"
-import { addComment, addLike, getComments, getLikes, removeLike } from "@/lib/firestore"
+import { addComment, addLike, getComments, getLikes, removeLike, deleteComment } from "@/lib/firestore"
 import { useCommentDialog } from "@/store/useCommentDialog"
 
 // Mock toilet data - replace with actual data fetching
@@ -95,33 +95,6 @@ export function CommentDialog() {
     }
   }, [user])
 
-  const loadToiletData = async () => {
-    if (!selectedToiletId) return
-
-    setIsLoading(true)
-    try {
-      // Find toilet in mock data - replace with actual Firestore query
-      const foundToilet = mockToilets.find((t : any) => t.id === selectedToiletId)
-      setToilet(foundToilet || null)
-
-      // Load comments and likes
-      const [commentsData, likesData] = await Promise.all([getComments(selectedToiletId), getLikes(selectedToiletId)])
-
-      setComments(commentsData)
-      setLikes(likesData)
-
-      // Find user's like/dislike
-      if (user) {
-        const userLikeData = likesData.find((like) => like.userId === user.uid)
-        setUserLike(userLikeData || null)
-      }
-    } catch (error) {
-      console.error("Error loading toilet data:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedToiletId || !userName.trim() || !commentText.trim() || rating === 0) return
@@ -141,7 +114,11 @@ export function CommentDialog() {
         rating,
       })
 
-      setComments((prev : any) => [newComment, ...prev])
+      setComments((prev : any) => [{
+        ...newComment,
+        text: newComment.content,
+        userImage: `https://api.dicebear.com/7.x/initials/svg?seed=${userName.trim()}`
+      }, ...prev])
       setCommentText("")
       setRating(0)
     } catch (error) {
@@ -179,6 +156,17 @@ export function CommentDialog() {
       }
     } catch (error) {
       console.error("Error handling like/dislike:", error)
+    }
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!selectedToiletId || !user) return
+
+    try {
+      await deleteComment(commentId, selectedToiletId)
+      setComments((prev) => prev.filter((comment) => comment.id !== commentId))
+    } catch (error) {
+      console.error("Error deleting comment:", error)
     }
   }
 
@@ -351,27 +339,30 @@ export function CommentDialog() {
                       <div key={comment.id}>
                         <div className="flex gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${comment.userName}`} />
-                            <AvatarFallback>
-                              {comment.userName
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .toUpperCase()}
-                            </AvatarFallback>
+                            <AvatarImage src={comment.userImage} />
                           </Avatar>
 
                           <div className="flex-1 space-y-2">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                              <span className="font-medium text-sm">{comment.userName}</span>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">{comment.userName}</span>
                                 <div className="flex items-center">{renderStars(comment.rating)}</div>
                                 <Badge variant="outline" className="text-xs">
                                   {formatDate(comment.createdAt)}
                                 </Badge>
                               </div>
+                              {user && comment.userId === user.uid && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  className="flex items-center gap-1"
+                                  onClick={() => handleDeleteComment(comment.id)}
+                                >
+                                  <Trash2 size={14} />
+                                  <span>Supprimer</span>
+                                </Button>
+                              )}
                             </div>
-
                             <p className="text-sm text-muted-foreground leading-relaxed">{comment.text}</p>
                           </div>
                         </div>
