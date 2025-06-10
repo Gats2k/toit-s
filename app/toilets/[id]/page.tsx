@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { 
   MapPin, Star, Navigation, Calendar, Clock, MessageCircle, 
-  ThumbsUp, ThumbsDown, Flag, ChevronLeft, Edit, Share2
+  ThumbsUp, ThumbsDown, Flag, ChevronLeft, Edit, Share2, Trash2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -24,8 +24,10 @@ import {
   getStatusColor, getFeatureLabel, getFeatureIcon
 } from '@/lib/utils';
 import { Toilet, Comment, ToiletFeature } from '@/lib/types';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, increment, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase/client';
+import { CommentDialog } from '@/components/comment-dialog';
+import { useCommentDialog } from '@/store/useCommentDialog';
 
 // Configuration pour les routes dynamiques
 export const dynamic = 'force-dynamic';
@@ -42,6 +44,7 @@ export default function ToiletDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuthStore();
   const { toast } = useToast();
+  const { openDialog } = useCommentDialog();
   
   // Charger la toilette et les commentaires depuis Firestore
   useEffect(() => {
@@ -196,6 +199,37 @@ export default function ToiletDetailPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) return;
+
+    try {
+      // Supprimer le commentaire de Firestore
+      const commentRef = doc(db, "comments", commentId);
+      await deleteDoc(commentRef);
+
+      // Mettre à jour le compteur de commentaires
+      const toiletRef = doc(db, "toilets", toilet?.id);
+      await updateDoc(toiletRef, {
+        commentsCount: increment(-1),
+      });
+
+      // Mettre à jour l'état local
+      setComments(comments.filter(comment => comment.id !== commentId));
+
+      toast({
+        title: "Commentaire supprimé",
+        description: "Votre commentaire a été supprimé avec succès.",
+      });
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le commentaire.",
+        variant: "destructive",
+      });
+    }
+  };
   
   return (
     <div className="space-y-6">
@@ -206,7 +240,19 @@ export default function ToiletDetailPage() {
             Back
           </Link>
         </Button>
+        {toilet && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openDialog(toilet.id)}
+          >
+            <MessageCircle size={16} className="mr-2" />
+            Voir les commentaires
+          </Button>
+        )}
       </div>
+      
+      <CommentDialog />
       
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -390,12 +436,22 @@ export default function ToiletDetailPage() {
                             </p>
                           </div>
                           
-                          <div className="flex items-center">
+                          <div className="flex items-center gap-2">
                             {comment.rating && (
                               <div className="flex items-center">
                                 <Star className={`h-4 w-4 ${comment.rating >= 3 ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-300 text-gray-300'}`} />
                                 <span className="ml-1 text-sm font-medium">{comment.rating}</span>
                               </div>
+                            )}
+                            {user && user.uid === comment.userId && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteComment(comment.id)}
+                              >
+                                <Trash2 size={14} />
+                              </Button>
                             )}
                           </div>
                         </div>

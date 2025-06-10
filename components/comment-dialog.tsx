@@ -20,7 +20,6 @@ import type { Comment, Like, Toilet } from "@/lib/types"
 import { addComment, addLike, getComments, getLikes, removeLike, deleteComment } from "@/lib/firestore"
 import { useCommentDialog } from "@/store/useCommentDialog"
 
-// Mock toilet data - replace with actual data fetching
 const mockToilets: any = [
   {
     id: "1",
@@ -47,30 +46,52 @@ export function CommentDialog() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Form state
   const [userName, setUserName] = useState("")
   const [commentText, setCommentText] = useState("")
   const [rating, setRating] = useState(0)
   const [hoveredStar, setHoveredStar] = useState(0)
 
-  // Load toilet data and comments when dialog opens
+  console.log('CommentDialog rendered:', {
+    isOpen,
+    selectedToiletId,
+    user,
+    commentsCount: comments.length
+  })
 
   const loadToiletData = useCallback(async () => {
     if (!selectedToiletId) return
 
+    console.log('Loading toilet data for ID:', selectedToiletId)
     setIsLoading(true)
     try {
-      // Find toilet in mock data - replace with actual Firestore query
-      const foundToilet = mockToilets.find((t : any) => t.id === selectedToiletId)
+      const foundToilet = mockToilets.find((t: any) => t.id === selectedToiletId)
       setToilet(foundToilet || null)
 
-      // Load comments and likes
-      const [commentsData, likesData] = await Promise.all([getComments(selectedToiletId), getLikes(selectedToiletId)])
+      const [commentsData, likesData] = await Promise.all([
+        getComments(selectedToiletId), 
+        getLikes(selectedToiletId)
+      ])
 
-      setComments(commentsData)
+      console.log('Raw comments data:', commentsData)
+      console.log('Current user:', user)
+
+      const processedComments = commentsData.map(comment => {
+        console.log('Processing comment:', {
+          original: comment,
+          userId: comment.userId,
+          currentUser: user?.uid
+        })
+        return {
+          ...comment,
+          userImage: `https://api.dicebear.com/7.x/initials/svg?seed=${comment.userName}`,
+          text: comment.content || comment.text
+        }
+      })
+
+      console.log('Processed comments:', processedComments)
+      setComments(processedComments)
       setLikes(likesData)
 
-      // Find user's like/dislike
       if (user) {
         const userLikeData = likesData.find((like) => like.userId === user.uid)
         setUserLike(userLikeData || null)
@@ -83,17 +104,35 @@ export function CommentDialog() {
   }, [selectedToiletId, user])
 
   useEffect(() => {
+    console.log('Dialog state changed:', { isOpen, selectedToiletId })
     if (isOpen && selectedToiletId) {
       loadToiletData()
     }
   }, [isOpen, selectedToiletId, loadToiletData])
 
-  // Set user name from auth
   useEffect(() => {
+    console.log('User state changed:', user)
     if (user) {
       setUserName(user.displayName || user.email?.split("@")[0] || "")
     }
   }, [user])
+
+  useEffect(() => {
+    console.log('Comments or user changed:', { comments, user })
+  }, [comments, user])
+
+  useEffect(() => {
+    if (comments.length > 0) {
+      comments.forEach(comment => {
+        console.log('Comment data:', {
+          hasUser: !!user,
+          commentUserId: comment.userId,
+          currentUserId: user?.uid,
+          shouldShow: user && comment.userId === user.uid
+        })
+      })
+    }
+  }, [comments, user])
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -114,7 +153,7 @@ export function CommentDialog() {
         rating,
       })
 
-      setComments((prev : any) => [{
+      setComments((prev: any) => [{
         ...newComment,
         text: newComment.content,
         userImage: `https://api.dicebear.com/7.x/initials/svg?seed=${userName.trim()}`
@@ -135,13 +174,11 @@ export function CommentDialog() {
     }
 
     try {
-      // If user already has the same reaction, remove it
       if (userLike?.type === type) {
         await removeLike(selectedToiletId, user.uid)
         setLikes((prev) => prev.filter((like) => like.userId !== user.uid))
         setUserLike(null)
       } else {
-        // Add new like/dislike (this will replace any existing one)
         const newLike = await addLike({
           toiletId: selectedToiletId,
           userId: user.uid,
@@ -204,7 +241,10 @@ export function CommentDialog() {
   const dislikesCount = likes.filter((like) => like.type === "dislike").length
 
   return (
-    <Dialog open={isOpen} onOpenChange={closeDialog}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      console.log('Dialog open state changed:', open)
+      if (!open) closeDialog()
+    }}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -228,7 +268,6 @@ export function CommentDialog() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col gap-4 min-h-0">
-            {/* Stats */}
             <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-2">
                 <MessageSquare size={16} />
@@ -258,7 +297,6 @@ export function CommentDialog() {
               </div>
             </div>
 
-            {/* Auth Alert */}
             {!user && (
               <Alert>
                 <AlertCircle className="h-4 w-4" />
@@ -271,7 +309,6 @@ export function CommentDialog() {
               </Alert>
             )}
 
-            {/* Comment Form */}
             {user && (
               <form onSubmit={handleSubmitComment} className="space-y-4 p-4 border rounded-lg">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -323,7 +360,6 @@ export function CommentDialog() {
               </form>
             )}
 
-            {/* Comments List */}
             <div className="flex-1 min-h-0">
               <h3 className="font-medium mb-3">Commentaires récents</h3>
               {comments.length === 0 ? (
@@ -335,41 +371,67 @@ export function CommentDialog() {
               ) : (
                 <ScrollArea className="h-[300px] pr-4">
                   <div className="space-y-4">
-                    {comments.map((comment, index) => (
-                      <div key={comment.id}>
-                        <div className="flex gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={comment.userImage} />
-                          </Avatar>
+                    {comments.map((comment, index) => {
+                      console.log('Rendering comment:', comment)
+                      return (
+                        <div key={comment.id}>
+                          <div className="flex gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={comment.userImage} />
+                              <AvatarFallback>{comment.userName.charAt(0)}</AvatarFallback>
+                            </Avatar>
 
-                          <div className="flex-1 space-y-2">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-sm">{comment.userName}</span>
-                                <div className="flex items-center">{renderStars(comment.rating)}</div>
-                                <Badge variant="outline" className="text-xs">
-                                  {formatDate(comment.createdAt)}
-                                </Badge>
+                            <div className="flex-1 space-y-2">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm">{comment.userName}</span>
+                                  <div className="flex items-center">{renderStars(comment.rating)}</div>
+                                  <Badge variant="outline" className="text-xs">
+                                    {formatDate(comment.createdAt)}
+                                  </Badge>
+                                </div>
                               </div>
-                              {user && comment.userId === user.uid && (
+                              <p className="text-sm text-muted-foreground leading-relaxed">{comment.text || comment.content}</p>
+                              <div className="flex items-center gap-2 pt-2">
                                 <Button
-                                  variant="destructive"
+                                  variant="outline"
                                   size="sm"
                                   className="flex items-center gap-1"
-                                  onClick={() => handleDeleteComment(comment.id)}
+                                  onClick={() => handleLikeDislike("like")}
                                 >
-                                  <Trash2 size={14} />
-                                  <span>Supprimer</span>
+                                  <ThumbsUp size={14} className="mr-1" />
+                                  <span className="text-xs">Helpful</span>
                                 </Button>
-                              )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex items-center gap-1"
+                                  onClick={() => handleLikeDislike("dislike")}
+                                >
+                                  <ThumbsDown size={14} className="mr-1" />
+                                  <span className="text-xs">Not helpful</span>
+                                </Button>
+                                {user && comment.userId === user.uid && (
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="flex items-center gap-1 ml-auto"
+                                    onClick={() => {
+                                      console.log('Delete button clicked for comment:', comment)
+                                      handleDeleteComment(comment.id)
+                                    }}
+                                  >
+                                    <Trash2 size={14} className="mr-1" />
+                                    <span className="text-xs">Supprimer</span>
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <p className="text-sm text-muted-foreground leading-relaxed">{comment.text}</p>
                           </div>
+                          {index < comments.length - 1 && <Separator className="mt-4" />}
                         </div>
-
-                        {index < comments.length - 1 && <Separator className="mt-4" />}
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </ScrollArea>
               )}

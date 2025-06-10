@@ -24,6 +24,7 @@ export interface Toilet {
 }
 
 export interface Comment {
+  content: string;
   id: string;
   toiletId: string;
   userId: string;
