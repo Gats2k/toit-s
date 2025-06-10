@@ -17,10 +17,13 @@ import { mockToilets } from '@/lib/mockData';
 import { Toilet, ToiletFeature } from '@/lib/types';
 
 // Dynamically import the Map component to avoid SSR issues with Leaflet
-const DynamicMap = dynamic(() => import('@/components/map-component'), {
-  ssr: false,
-  loading: () => <LoadingSpinner text="Loading map..." />,
-});
+const DynamicMap = dynamic(
+  () => import('@/components/map-component').then((mod) => mod.default),
+  {
+    ssr: false,
+    loading: () => <LoadingSpinner text="Loading map..." />,
+  }
+);
 
 export default function MapPage() {
   const { coordinates, error, loading } = useGeolocation();

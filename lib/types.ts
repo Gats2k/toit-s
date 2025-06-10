@@ -1,6 +1,6 @@
 // Interfaces pour Toilet, Comment, User et les types associés
 
-export type ToiletStatus = "available" | "occupied" | "closed";
+export type ToiletStatus = "available" | "occupied" | "out_of_order";
 export type ToiletFeature =
   | "wheelchair_accessible"
   | "baby_changing"

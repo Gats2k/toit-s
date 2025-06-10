@@ -77,11 +77,12 @@ export const ToiletList: React.FC<ToiletListProps> = ({
 
   return (
     <div className="space-y-6 md:px-4 lg:px-0 w-full h-full" >
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
         {filteredToilets.map((toilet : Toilet) => (
           <ToiletCard 
             key={toilet.id} 
-            toilet={toilet} 
+            toilet={toilet}
+            userCoordinates={userCoordinates || undefined}
           />
         ))}
       </div>

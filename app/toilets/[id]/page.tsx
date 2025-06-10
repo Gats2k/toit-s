@@ -23,7 +23,7 @@ import {
   formatDistance, calculateDistance, formatDate, 
   getStatusColor, getFeatureLabel, getFeatureIcon
 } from '@/lib/utils';
-import { Toilet, Comment, ToiletFeature } from '@/lib/types';
+import { Toilet, ToiletFeature } from '@/lib/types';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, updateDoc, increment, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase/client';
 import { CommentDialog } from '@/components/comment-dialog';
@@ -33,11 +33,25 @@ import { useCommentDialog } from '@/store/useCommentDialog';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+interface CommentWithVotes {
+  id: string;
+  toiletId: string;
+  userId: string;
+  userName: string;
+  userImage: string;
+  text: string;
+  rating: number;
+  createdAt: Date;
+  helpfulCount?: number;
+  notHelpfulCount?: number;
+  userVote?: 'helpful' | 'not_helpful' | null;
+}
+
 export default function ToiletDetailPage() {
   const params = useParams();
   const { coordinates } = useGeolocation();
   const [toilet, setToilet] = useState<Toilet | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<CommentWithVotes[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
   const [newRating, setNewRating] = useState(5);
@@ -45,6 +59,8 @@ export default function ToiletDetailPage() {
   const { user } = useAuthStore();
   const { toast } = useToast();
   const { openDialog } = useCommentDialog();
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [isVoting, setIsVoting] = useState(false);
   
   // Charger la toilette et les commentaires depuis Firestore
   useEffect(() => {
@@ -61,7 +77,8 @@ export default function ToiletDetailPage() {
           addedAt: data.addedAt?.toDate ? data.addedAt.toDate() : new Date(data.addedAt),
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
         } as Toilet);
-        // Charger les commentaires
+        
+        // Charger les commentaires avec les votes
         const commentsRef = collection(db, "comments");
         const q = query(commentsRef, where("toiletId", "==", id));
         const querySnapshot = await getDocs(q);
@@ -76,7 +93,10 @@ export default function ToiletDetailPage() {
             text: data.content || data.text || '',
             rating: data.rating,
             createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
-          } as Comment;
+            helpfulCount: data.helpfulCount || 0,
+            notHelpfulCount: data.notHelpfulCount || 0,
+            userVote: data.userVotes?.[user?.uid || ''] || null,
+          } as CommentWithVotes;
         });
         setComments(commentsData);
       } else {
@@ -85,7 +105,7 @@ export default function ToiletDetailPage() {
       setLoading(false);
     };
     fetchToilet();
-  }, [params.id]);
+  }, [params.id, user?.uid]);
   
   if (loading) {
     return <LoadingSpinner text="Loading toilet details..." />;
@@ -123,6 +143,30 @@ export default function ToiletDetailPage() {
     '24h': 'Clock',
   };
   
+  const renderStars = (rating: number, interactive = false) => {
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => {
+          const isFilled = interactive 
+            ? star <= (hoveredRating || newRating)
+            : star <= rating;
+          
+          return (
+            <Star
+              key={star}
+              className={`h-5 w-5 cursor-pointer transition-colors ${
+                isFilled ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+              }`}
+              onClick={interactive ? () => setNewRating(star) : undefined}
+              onMouseEnter={interactive ? () => setHoveredRating(star) : undefined}
+              onMouseLeave={interactive ? () => setHoveredRating(0) : undefined}
+            />
+          );
+        })}
+      </div>
+    );
+  };
+
   const handleSubmitComment = async () => {
     if (!user) {
       toast({
@@ -185,7 +229,7 @@ export default function ToiletDetailPage() {
           text: data.content || data.text || '',
           rating: data.rating,
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
-        } as Comment;
+        } as CommentWithVotes;
       });
       setComments(commentsData);
     } catch (error) {
@@ -230,6 +274,100 @@ export default function ToiletDetailPage() {
       });
     }
   };
+
+  // Fonction pour gérer les votes
+  const handleVote = async (commentId: string, voteType: 'helpful' | 'not_helpful') => {
+    if (!user) {
+      toast({
+        title: "Connexion requise",
+        description: "Vous devez être connecté pour voter sur les commentaires.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVoting(true);
+    try {
+      const commentRef = doc(db, "comments", commentId);
+      const commentDoc = await getDoc(commentRef);
+      
+      if (!commentDoc.exists()) {
+        throw new Error("Comment not found");
+      }
+
+      const commentData = commentDoc.data();
+      const currentVote = commentData.userVotes?.[user.uid] || null;
+      const helpfulCount = commentData.helpfulCount || 0;
+      const notHelpfulCount = commentData.notHelpfulCount || 0;
+
+      let newHelpfulCount = helpfulCount;
+      let newNotHelpfulCount = notHelpfulCount;
+
+      // Gérer les changements de vote
+      if (currentVote === voteType) {
+        // Retirer le vote
+        if (voteType === 'helpful') {
+          newHelpfulCount = Math.max(0, helpfulCount - 1);
+        } else {
+          newNotHelpfulCount = Math.max(0, notHelpfulCount - 1);
+        }
+        await updateDoc(commentRef, {
+          [`userVotes.${user.uid}`]: null,
+          helpfulCount: newHelpfulCount,
+          notHelpfulCount: newNotHelpfulCount,
+        });
+      } else {
+        // Ajouter ou changer le vote
+        if (currentVote === 'helpful') {
+          newHelpfulCount = Math.max(0, helpfulCount - 1);
+          newNotHelpfulCount = notHelpfulCount + 1;
+        } else if (currentVote === 'not_helpful') {
+          newHelpfulCount = helpfulCount + 1;
+          newNotHelpfulCount = Math.max(0, notHelpfulCount - 1);
+        } else {
+          if (voteType === 'helpful') {
+            newHelpfulCount = helpfulCount + 1;
+          } else {
+            newNotHelpfulCount = notHelpfulCount + 1;
+          }
+        }
+        await updateDoc(commentRef, {
+          [`userVotes.${user.uid}`]: voteType,
+          helpfulCount: newHelpfulCount,
+          notHelpfulCount: newNotHelpfulCount,
+        });
+      }
+
+      // Mettre à jour l'état local
+      setComments(comments.map(comment => {
+        if (comment.id === commentId) {
+          return {
+            ...comment,
+            helpfulCount: newHelpfulCount,
+            notHelpfulCount: newNotHelpfulCount,
+            userVote: currentVote === voteType ? null : voteType,
+          };
+        }
+        return comment;
+      }));
+
+      toast({
+        title: currentVote === voteType ? "Vote retiré" : "Vote enregistré",
+        description: currentVote === voteType 
+          ? "Votre vote a été retiré."
+          : "Merci pour votre retour !",
+      });
+    } catch (error) {
+      console.error("Error voting on comment:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'enregistrer votre vote.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVoting(false);
+    }
+  };
   
   return (
     <div className="space-y-6">
@@ -240,16 +378,7 @@ export default function ToiletDetailPage() {
             Back
           </Link>
         </Button>
-        {toilet && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => openDialog(toilet.id)}
-          >
-            <MessageCircle size={16} className="mr-2" />
-            Voir les commentaires
-          </Button>
-        )}
+        
       </div>
       
       <CommentDialog />
@@ -342,16 +471,6 @@ export default function ToiletDetailPage() {
                   Directions
                 </Link>
               </Button>
-              
-              <Button variant="outline">
-                <Share2 size={16} className="mr-2" />
-                Share
-              </Button>
-              
-              <Button variant="outline">
-                <Flag size={16} className="mr-2" />
-                Report Issue
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -386,18 +505,10 @@ export default function ToiletDetailPage() {
                 />
                 <div className="flex items-center gap-4 mb-4">
                   <span className="font-medium">Note:</span>
-                  <div className="flex-1 flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="5"
-                      step="0.5"
-                      value={newRating}
-                      onChange={(e) => setNewRating(Number(e.target.value))}
-                      className="w-full max-w-xs"
-                    />
-                    <span className="w-10 text-center">{newRating}</span>
-                  </div>
+                  {renderStars(newRating, true)}
+                  <span className="text-sm text-muted-foreground">
+                    {newRating} {newRating === 1 ? 'étoile' : 'étoiles'}
+                  </span>
                 </div>
                 <Button
                   onClick={handleSubmitComment}
@@ -432,15 +543,14 @@ export default function ToiletDetailPage() {
                           <div>
                             <p className="font-medium">{comment.userName}</p>
                             <p className="text-sm text-muted-foreground">
-                              {formatDate(comment.createdAt)}
+                              {formatDate(comment.createdAt.toISOString())}
                             </p>
                           </div>
                           
                           <div className="flex items-center gap-2">
                             {comment.rating && (
                               <div className="flex items-center">
-                                <Star className={`h-4 w-4 ${comment.rating >= 3 ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-300 text-gray-300'}`} />
-                                <span className="ml-1 text-sm font-medium">{comment.rating}</span>
+                                {renderStars(comment.rating)}
                               </div>
                             )}
                             {user && user.uid === comment.userId && (
@@ -459,13 +569,29 @@ export default function ToiletDetailPage() {
                         <p className="text-sm">{comment.text}</p>
                         
                         <div className="flex items-center gap-2 pt-2">
-                          <Button variant="ghost" size="sm" className="h-8 px-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className={`h-8 px-2 ${comment.userVote === 'helpful' ? 'text-primary' : ''}`}
+                            onClick={() => handleVote(comment.id, 'helpful')}
+                            disabled={isVoting}
+                          >
                             <ThumbsUp size={14} className="mr-1" />
-                            <span className="text-xs">Helpful</span>
+                            <span className="text-xs">
+                              Helpful {comment.helpfulCount ? `(${comment.helpfulCount})` : ''}
+                            </span>
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-8 px-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className={`h-8 px-2 ${comment.userVote === 'not_helpful' ? 'text-destructive' : ''}`}
+                            onClick={() => handleVote(comment.id, 'not_helpful')}
+                            disabled={isVoting}
+                          >
                             <ThumbsDown size={14} className="mr-1" />
-                            <span className="text-xs">Not helpful</span>
+                            <span className="text-xs">
+                              Not helpful {comment.notHelpfulCount ? `(${comment.notHelpfulCount})` : ''}
+                            </span>
                           </Button>
                         </div>
                       </div>

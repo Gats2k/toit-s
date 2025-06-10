@@ -6,7 +6,7 @@ import { createContext, useContext, useEffect, useState } from "react"
 import { onAuthStateChanged, type User } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
 import { auth, db } from "@/firebase/client"
-import LoadingSpinner  from "./loading-spinner"
+import { LoadingSpinner } from "./loading-spinner"
 
 type UserRole = "super_admin" | "moderator" | "municipal_rep" | "citizen" | null
 
@@ -25,12 +25,25 @@ interface AuthContextType {
   user: User | null
   userData: UserData | null
   loading: boolean
+  error: Error | null
+}
+
+const defaultUserData: UserData = {
+  uid: '',
+  email: null,
+  displayName: null,
+  role: null,
+  isActive: false,
+  photoURL: null,
+  createdAt: null,
+  lastLogin: null,
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   userData: null,
   loading: true,
+  error: null,
 })
 
 export const useAuth = () => useContext(AuthContext)
@@ -39,10 +52,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user)
+      setError(null)
 
       if (user) {
         try {
@@ -56,17 +71,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: user.email,
               displayName: user.displayName,
               photoURL: user.photoURL,
-              role: data.role,
-              isActive: data.isActive,
+              role: data.role || null,
+              isActive: data.isActive ?? false,
               createdAt: data.createdAt?.toDate() || null,
               lastLogin: data.lastLogin?.toDate() || null,
             })
           } else {
             // User document doesn't exist in Firestore
-            setUserData(null)
+            setUserData({
+              ...defaultUserData,
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+            })
           }
         } catch (error) {
           console.error("Error fetching user data:", error)
+          setError(error instanceof Error ? error : new Error('Unknown error occurred'))
           setUserData(null)
         }
       } else {
@@ -80,8 +102,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   if (loading) {
-    return <LoadingSpinner />
+    return <LoadingSpinner text="Chargement de l'authentification..." />
   }
 
-  return <AuthContext.Provider value={{ user, userData, loading }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, userData, loading, error }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }

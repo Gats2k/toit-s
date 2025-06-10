@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { auth } from '@/firebase/client';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AuthDialog } from './ui/auth-dialog';
-
+import { AddToiletForm } from './add-toilet-form';
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
@@ -41,8 +41,7 @@ export function Header() {
     ? [
         {
           name: 'Add Toilet',
-          href: '/toilets/add',
-          icon: <PlusCircle size={18} />,
+          component: <AddToiletForm variant="link" className="text-sm font-medium transition-colors hover:text-primary flex items-center text-muted-foreground" />,
         },
         {
           name: 'Profile',
@@ -98,18 +97,24 @@ export function Header() {
             {user ? (
               <>
                 {authNavItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`text-sm font-medium transition-colors hover:text-primary flex items-center ${
-                      pathname === item.href
-                        ? 'text-foreground'
-                        : 'text-muted-foreground'
-                    }`}
-                  >
-                    {item.icon}
-                    <span className="ml-1">{item.name}</span>
-                  </Link>
+                  item.component ? (
+                    <div key={item.name}>
+                      {item.component}
+                    </div>
+                  ) : (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`text-sm font-medium transition-colors hover:text-primary flex items-center ${
+                        pathname === item.href
+                          ? 'text-foreground'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      {item.icon}
+                      <span className="ml-1">{item.name}</span>
+                    </Link>
+                  )
                 ))}
                 <Button variant="outline" onClick={logout}>
                   Log out
@@ -173,19 +178,25 @@ export function Header() {
                 {user ? (
                   <>
                     {authNavItems.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-center py-2 text-sm font-medium transition-colors hover:text-primary ${
-                          pathname === item.href
-                            ? 'text-foreground'
-                            : 'text-muted-foreground'
-                        }`}
-                        onClick={closeSheet}
-                      >
-                        {item.icon}
-                        <span className="ml-2">{item.name}</span>
-                      </Link>
+                      item.component ? (
+                        <div key={item.name} onClick={closeSheet}>
+                          {item.component}
+                        </div>
+                      ) : (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`flex items-center py-2 text-sm font-medium transition-colors hover:text-primary ${
+                            pathname === item.href
+                              ? 'text-foreground'
+                              : 'text-muted-foreground'
+                          }`}
+                          onClick={closeSheet}
+                        >
+                          {item.icon}
+                          <span className="ml-2">{item.name}</span>
+                        </Link>
+                      )
                     ))}
                     <button
                       onClick={() => {
