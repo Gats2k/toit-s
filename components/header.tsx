@@ -124,14 +124,17 @@ export function Header() {
               <>
                 <Button 
                   variant="ghost" 
-                  onClick={() => useAuthStore.getState().setAuthDialogOpen(true)}
+                  onClick={() => {
+                    useAuthStore.getState().setIsLoginForm(true)
+                    useAuthStore.getState().setAuthDialogOpen(true)
+                  }}
                 >
                   Log in
                 </Button>
                 <Button 
                   onClick={() => {
+                    useAuthStore.getState().setIsLoginForm(false)
                     useAuthStore.getState().setAuthDialogOpen(true)
-                    useAuthStore.getState().toggleAuthForm()
                   }}
                 >
                   Sign up
@@ -156,7 +159,7 @@ export function Header() {
             <SheetContent side="left" className="w-64 max-w-full">
               <Link href="/" className="flex items-center space-x-2" onClick={closeSheet}>
                 <MapPin className="h-6 w-6" />
-                <span className="font-bold">ToiletFinder</span>
+                <span className="font-bold">Toit'sMap</span>
               </Link>
               <nav className="mt-8 flex flex-col space-y-3">
                 {navItems.map((item) => (
@@ -213,6 +216,7 @@ export function Header() {
                   <>
                     <button
                       onClick={() => {
+                        useAuthStore.getState().setIsLoginForm(true)
                         useAuthStore.getState().setAuthDialogOpen(true)
                         closeSheet()
                       }}
@@ -223,8 +227,8 @@ export function Header() {
                     </button>
                     <button
                       onClick={() => {
+                        useAuthStore.getState().setIsLoginForm(false)
                         useAuthStore.getState().setAuthDialogOpen(true)
-                        useAuthStore.getState().toggleAuthForm()
                         closeSheet()
                       }}
                       className="flex items-center py-2 text-sm font-medium transition-colors hover:text-primary"

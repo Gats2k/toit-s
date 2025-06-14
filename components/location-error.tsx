@@ -5,10 +5,12 @@ import { motion } from 'framer-motion';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { LocationError } from '@/lib/types';
 
 interface LocationErrorProps {
-  error: LocationError;
+  error: {
+    code: number;
+    message?: string;
+  };
   onRetry: () => void;
 }
 

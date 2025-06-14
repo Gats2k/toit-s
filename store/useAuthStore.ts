@@ -10,6 +10,7 @@ interface AuthState {
   setLoading: (isLoading: boolean) => void
   isAuthDialogOpen: boolean
   setAuthDialogOpen: (open: boolean) => void
+  setIsLoginForm: (isLoginForm: boolean) => void
   logout: () => Promise<void>
 }
 
@@ -22,6 +23,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
   isAuthDialogOpen: false,
   setAuthDialogOpen: (isAuthDialogOpen) => set({ isAuthDialogOpen }),
+  setIsLoginForm: (isLoginForm) => set({ isLoginForm }),
   logout: async () => {
     const { auth } = await import('@/firebase/client')
     await auth.signOut()
