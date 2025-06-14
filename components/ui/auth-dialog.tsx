@@ -138,10 +138,11 @@ export function AuthDialog() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="email@exemple.com" 
-                      {...field} 
+                    <Input
+                      placeholder="email@exemple.com"
+                      {...field}
                       disabled={isLoading}
+                      className="rounded-xl border-gray-300 focus:border-blue-500 focus:ring-0 px-4 py-2"
                     />
                   </FormControl>
                   <FormMessage />
@@ -155,11 +156,12 @@ export function AuthDialog() {
                 <FormItem>
                   <FormLabel>Mot de passe</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="password" 
-                      placeholder="••••••" 
-                      {...field} 
+                    <Input
+                      type="password"
+                      placeholder="••••••"
+                      {...field}
                       disabled={isLoading}
+                      className="rounded-xl border-gray-300 focus:border-blue-500 focus:ring-0 px-4 py-2"
                     />
                   </FormControl>
                   <FormMessage />
@@ -173,9 +175,9 @@ export function AuthDialog() {
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800 rounded-xl py-3" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoginForm ? "Se connecter" : "S'inscrire"}
+              {isLoginForm ? "Continuer" : "S'inscrire"}
             </Button>
           </form>
         </Form>
@@ -186,48 +188,30 @@ export function AuthDialog() {
               <Separator className="w-full" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                OU CONTINUER AVEC
+              <span className="bg-white px-2 text-muted-foreground">
+                OU
               </span>
             </div>
           </div>
 
-          <Button 
-            variant="outline" 
-            className="w-full mt-6 gap-2"
+          <Button
+            variant="outline"
+            className="w-full mt-6 gap-2 border-gray-300 rounded-xl py-3 flex items-center justify-center text-base"
             onClick={handleGoogleSignIn}
             disabled={isLoading}
           >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <svg className="w-5 h-5" viewBox="0 0 48 48">
-                <g>
-                  <path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.1 33.1 29.7 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c2.7 0 5.2.9 7.2 2.4l6.4-6.4C34.1 5.1 29.3 3 24 3 12.9 3 4 11.9 4 23s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.2-4z"/>
-                  <path fill="#34A853" d="M6.3 14.7l7 5.1C15.1 17.1 19.2 14 24 14c2.7 0 5.2.9 7.2 2.4l6.4-6.4C34.1 5.1 29.3 3 24 3c-7.2 0-13.3 4.1-16.7 10.1z"/>
-                  <path fill="#FBBC05" d="M24 44c5.7 0 10.5-1.9 14.1-5.1l-6.5-5.3C29.7 36 24 36 24 36c-5.7 0-10.5-1.9-14.1-5.1l6.5-5.3C18.3 32.9 21.9 34 24 34z"/>
-                  <path fill="#EA4335" d="M44.5 20H24v8.5h11.7C34.1 33.1 29.7 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c2.7 0 5.2.9 7.2 2.4l6.4-6.4C34.1 5.1 29.3 3 24 3 12.9 3 4 11.9 4 23s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.2-4z"/>
-                </g>
-              </svg>
-            )}
-            Google
+            <img src="google_icon.png" alt="Google Icon" className="h-5 w-5" />
+            Continuer avec Google
           </Button>
-
-          {googleError && (
-            <div className="mt-2 text-sm font-medium text-destructive">
-              {googleError.message}
-            </div>
-          )}
-
-          <div className="mt-4 text-center text-sm">
-            {isLoginForm ? "Pas encore de compte ?" : "Déjà un compte ?"}{" "}
-            <Button 
-              variant="link" 
-              className="p-0 h-auto" 
+          <div className="text-center text-sm text-muted-foreground mt-4">
+            {isLoginForm ? "Vous n'avez pas de compte ?" : "Vous avez déjà un compte ?"} {''}
+            <Button
+              variant="link"
               onClick={toggleAuthForm}
+              className="p-0 h-auto text-blue-600 hover:text-blue-700 font-semibold"
               disabled={isLoading}
             >
-              {isLoginForm ? "Créer un compte" : "Se connecter"}
+              {isLoginForm ? "S'inscrire" : "Connexion"}
             </Button>
           </div>
         </div>

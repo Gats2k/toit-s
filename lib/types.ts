@@ -48,3 +48,10 @@ export interface Like {
   userId: string;
   type: "like" | "dislike";
 }
+
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
