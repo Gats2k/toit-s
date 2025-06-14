@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { useAuthState } from 'react-firebase-hooks/auth'
 import { auth } from '@/firebase/client'
+import { updateProfile, updateEmail, updatePassword } from 'firebase/auth'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,19 +43,19 @@ export default function ProfilePage() {
       if (user) {
         // Update display name
         if (displayName !== user.displayName) {
-          await user.updateProfile({ displayName })
+          await updateProfile(user, { displayName })
           setProfileMessage('Nom d\'affichage mis à jour.')
         }
 
         // Update email
         if (email !== user.email) {
-          await user.updateEmail(email)
+          await updateEmail(user, email)
           setProfileMessage(prev => prev + ' Email mis à jour.')
         }
 
         // Update password
         if (password && password === confirmPassword) {
-          await user.updatePassword(password)
+          await updatePassword(user, password)
           setProfileMessage(prev => prev + ' Mot de passe mis à jour.')
           setPassword('')
           setConfirmPassword('')
