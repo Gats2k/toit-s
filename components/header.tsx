@@ -1,39 +1,113 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, MapPin, Search, Map as MapIcon, PlusCircle } from 'lucide-react';
+import { Menu, X, MapPin, Search, Map as MapIcon, PlusCircle, Shield } from 'lucide-react';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { auth } from '@/firebase/client';
+import { auth, db } from '@/firebase/client';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AuthDialog } from './ui/auth-dialog';
 import { AddToiletForm } from './add-toilet-form';
+import { toast } from 'sonner';
+import { SUPER_ADMIN_EMAIL, isSuperAdmin } from '@/lib/roles';
+
+type UserRole = "super_admin" | "moderator" | "municipal_rep" | "citizen" | null;
+
+interface UserData {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  role: UserRole;
+  isActive: boolean;
+  photoURL: string | null;
+  createdAt: Date | null;
+  lastLogin: Date | null;
+}
 
 export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
   const [firebaseUser] = useAuthState(auth);
+  const [userData, setUserData] = useState<UserData | null>(null);
   
   const closeSheet = () => setIsOpen(false);
 
+  useEffect(() => {
+    const handleUserData = async (currentUser: any) => {
+      if (currentUser) {
+        try {
+          const userDocRef = doc(db, "users", currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setUserData({
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              photoURL: currentUser.photoURL,
+              role: data.role || null,
+              isActive: data.isActive ?? false,
+              createdAt: data.createdAt?.toDate() || null,
+              lastLogin: data.lastLogin?.toDate() || null,
+            });
+          } else {
+            // Create new user document if it doesn't exist
+            const isSuperAdmin = currentUser.email === SUPER_ADMIN_EMAIL;
+            const newUserData = {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              photoURL: currentUser.photoURL,
+              role: isSuperAdmin ? 'super_admin' as UserRole : 'citizen' as UserRole,
+              isActive: true,
+              createdAt: new Date(),
+              lastLogin: new Date(),
+            };
+            
+            await setDoc(userDocRef, newUserData);
+            setUserData(newUserData);
+            toast.success(isSuperAdmin ? 'Compte Super Admin créé avec succès !' : 'Compte créé avec succès !');
+          }
+        } catch (error) {
+          console.error("Error handling user data:", error);
+          toast.error('Erreur lors de la création du compte');
+          setUserData(null);
+        }
+      } else {
+        setUserData(null);
+      }
+    };
+
+    if (firebaseUser) {
+      handleUserData(firebaseUser);
+    }
+  }, [firebaseUser]);
+
   const navItems = [
-    {
-      name: 'Nearby',
-      href: '/',
-      icon: <MapPin size={18} />,
-    },
+    // {
+    //   name: 'Nearby',
+    //   href: '/',
+    //   icon: <MapPin size={18} />,
+    // },
     {
       name: 'Map',
       href: '/map',
       icon: <MapIcon size={18} />,
     },
+    ...(isSuperAdmin(userData?.email || firebaseUser?.email) ? [{
+      name: 'Admin',
+      href: '/admin',
+      icon: <Shield size={18} />,
+    }] : []),
   ];
 
   // Conditional nav items based on authentication
@@ -57,15 +131,6 @@ export function Header() {
         },
       ]
     : [];
-
-  // Add admin option if user is admin (you can customize this based on your role system)
-  if (user?.email?.endsWith('@admin.com')) { // Example condition for admin
-    authNavItems.push({
-      name: 'Admin',
-      href: '/admin',
-      icon: <PlusCircle size={18} />,
-    });
-  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

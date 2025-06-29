@@ -7,7 +7,7 @@ import { SharedLayout } from '@/components/shared-layout';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'ToiletFinder - Find public toilets near you',
+  title: 'Toit\'sMap - Trouvez les toilettes publiques près de chez vous',
   description: 'Find clean, accessible public toilets near your location with ease.',
 };
 

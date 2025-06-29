@@ -182,3 +182,62 @@ export function hasPermission(userRole: UserRole, permission: string): boolean {
 export function getRoleByName(roleName: string): RoleDefinition | undefined {
   return ROLES.find((role) => role.id === roleName)
 }
+
+// Constante pour l'email du super administrateur
+export const SUPER_ADMIN_EMAIL = 'tresorgatsobeau@gmail.com'
+
+// Fonction pour vérifier si un utilisateur est le super administrateur
+export function isSuperAdmin(userEmail: string | null | undefined): boolean {
+  return userEmail === SUPER_ADMIN_EMAIL
+}
+
+// Fonction pour vérifier si un utilisateur peut modifier les rôles
+export function canModifyRoles(userEmail: string | null | undefined): boolean {
+  return isSuperAdmin(userEmail)
+}
+
+// Fonction pour vérifier si un utilisateur peut modifier un rôle spécifique
+export function canModifyUserRole(
+  currentUserEmail: string | null | undefined, 
+  targetUserEmail: string | null | undefined
+): boolean {
+  // Seul le super admin peut modifier les rôles
+  if (!isSuperAdmin(currentUserEmail)) {
+    return false
+  }
+  
+  // Le super admin ne peut pas modifier son propre rôle
+  if (targetUserEmail === SUPER_ADMIN_EMAIL) {
+    return false
+  }
+  
+  return true
+}
+
+// Fonction pour vérifier si un utilisateur peut supprimer un autre utilisateur
+export function canDeleteUser(
+  currentUserEmail: string | null | undefined, 
+  targetUserEmail: string | null | undefined
+): boolean {
+  // Seul le super admin peut supprimer des utilisateurs
+  if (!isSuperAdmin(currentUserEmail)) {
+    return false
+  }
+  
+  // Le super admin ne peut pas se supprimer lui-même
+  if (targetUserEmail === SUPER_ADMIN_EMAIL) {
+    return false
+  }
+  
+  return true
+}
+
+// Fonction pour obtenir les rôles disponibles selon les permissions de l'utilisateur
+export function getAvailableRoles(currentUserEmail: string | null | undefined): UserRole[] {
+  if (isSuperAdmin(currentUserEmail)) {
+    return ['super_admin', 'moderator', 'municipal_rep', 'citizen']
+  }
+  
+  // Les autres utilisateurs ne peuvent pas modifier les rôles
+  return []
+}

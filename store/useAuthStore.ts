@@ -28,5 +28,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     const { auth } = await import('@/firebase/client')
     await auth.signOut()
     set({ user: null })
+    
+    // Actualiser la page après la déconnexion
+    if (typeof window !== 'undefined') {
+      window.location.reload()
+    }
   }
 }))

@@ -4,9 +4,10 @@ import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { onAuthStateChanged, type User } from "firebase/auth"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, setDoc } from "firebase/firestore"
 import { auth, db } from "@/firebase/client"
 import { LoadingSpinner } from "./loading-spinner"
+import { useAuthState } from "react-firebase-hooks/auth"
 
 type UserRole = "super_admin" | "moderator" | "municipal_rep" | "citizen" | null
 
@@ -49,64 +50,64 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, loading, error] = useAuthState(auth)
   const [userData, setUserData] = useState<UserData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user)
-      setError(null)
-
-      if (user) {
+    const handleUserData = async (currentUser: User | null) => {
+      if (currentUser) {
         try {
-          const userDocRef = doc(db, "users", user.uid)
+          const userDocRef = doc(db, "users", currentUser.uid)
           const userDoc = await getDoc(userDocRef)
 
           if (userDoc.exists()) {
             const data = userDoc.data()
             setUserData({
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName,
-              photoURL: user.photoURL,
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              photoURL: currentUser.photoURL,
               role: data.role || null,
               isActive: data.isActive ?? false,
               createdAt: data.createdAt?.toDate() || null,
               lastLogin: data.lastLogin?.toDate() || null,
             })
           } else {
-            // User document doesn't exist in Firestore
-            setUserData({
-              ...defaultUserData,
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName,
-              photoURL: user.photoURL,
-            })
+            // Create new user document if it doesn't exist
+            const newUserData = {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              photoURL: currentUser.photoURL,
+              role: 'citizen' as UserRole,
+              isActive: true,
+              createdAt: new Date(),
+              lastLogin: new Date(),
+            }
+            
+            await setDoc(userDocRef, newUserData)
+            setUserData(newUserData)
           }
         } catch (error) {
-          console.error("Error fetching user data:", error)
-          setError(error instanceof Error ? error : new Error('Unknown error occurred'))
+          console.error("Error handling user data:", error)
           setUserData(null)
         }
       } else {
         setUserData(null)
       }
+    }
 
-      setLoading(false)
-    })
-
-    return () => unsubscribe()
-  }, [])
+    if (user !== undefined) {
+      handleUserData(user)
+    }
+  }, [user])
 
   if (loading) {
     return <LoadingSpinner text="Chargement de l'authentification..." />
   }
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, error }}>
+    <AuthContext.Provider value={{ user: user || null, userData, loading, error: error || null }}>
       {children}
     </AuthContext.Provider>
   )

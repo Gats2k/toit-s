@@ -13,32 +13,12 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import { useGeolocation } from '@/lib/geolocation';
-import { mockToilets } from '@/lib/mockData';
-import { Toilet, ToiletFeature } from '@/lib/types';
+import { ToiletFeature } from '@/lib/types';
 
 export default function Home() {
   const { coordinates, error, loading, getLocation } = useGeolocation();
-  const [toilets, setToilets] = useState<Toilet[]>(mockToilets);
-  const [filteredToilets, setFilteredToilets] = useState<Toilet[]>(mockToilets);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFeatures, setSelectedFeatures] = useState<ToiletFeature[]>([]);
-
-  // Filter toilets when search query or features change
-  useEffect(() => {
-    let result = [...toilets];
-    
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        toilet => 
-          toilet.name.toLowerCase().includes(query) || 
-          toilet.address.toLowerCase().includes(query)
-      );
-    }
-    
-    setFilteredToilets(result);
-  }, [toilets, searchQuery]);
 
   // Handle search
   const handleSearch = (query: string) => {
@@ -68,7 +48,6 @@ export default function Home() {
           <LocationErrorDisplay error={error} onRetry={getLocation} />
         ) : (
           <ToiletList 
-            toilets={filteredToilets}
             userCoordinates={coordinates}
             searchQuery={searchQuery}
             filters={{

@@ -12,10 +12,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Loader2 } from 'lucide-react'
+import { usePageRefresh } from '@/hooks/usePageRefresh'
 
 export default function ProfilePage() {
   const [user, loading, error] = useAuthState(auth)
   const router = useRouter()
+  const refreshPage = usePageRefresh()
 
   const [displayName, setDisplayName] = useState(user?.displayName || '')
   const [email, setEmail] = useState(user?.email || '')
@@ -78,8 +80,8 @@ export default function ProfilePage() {
       try {
         if (user) {
           await user.delete()
-          // Redirect after successful deletion
-          router.push('/')
+          // Actualiser la page après la suppression du compte
+          refreshPage()
         }
       } catch (err: any) {
         console.error('Error deleting account:', err)
