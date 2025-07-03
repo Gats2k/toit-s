@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { UserRole, SUPER_ADMIN_EMAIL, isSuperAdmin, canModifyUserRole, canDeleteUser, getAvailableRoles } from '@/lib/roles'
+import { UserRole, isSuperAdmin } from '@/lib/roles'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Switch } from '@/components/ui/switch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { LayoutGrid, List, Shield, Crown } from 'lucide-react'
+import { LayoutGrid, List, Shield } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
@@ -34,15 +34,12 @@ interface User {
   lastLogin: Date | null
 }
 
-const DashBoardPage = () => {
+const ModeratorPage = () => {
   const [users, setUsers] = React.useState<User[]>([])
   const [loading, setLoading] = React.useState(true)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table')
   const [searchQuery, setSearchQuery] = useState('')
   const { user: currentUser } = useAuthStore()
-
-  // Vérifier si l'utilisateur actuel est le super admin
-  const isCurrentUserSuperAdmin = isSuperAdmin(currentUser?.email)
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -64,26 +61,22 @@ const DashBoardPage = () => {
         setLoading(false)
       }
     }
-
     fetchUsers()
   }, [])
 
+  // Les modérateurs ne peuvent pas modifier/supprimer les super admins ou les autres modérateurs
+  const canModifyOrDelete = (target: User) => {
+    if (!target.role) return false
+    return target.role !== 'super_admin' && target.role !== 'moderator'
+  }
+
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
+    const targetUser = users.find(u => u.id === userId)
+    if (!targetUser || !canModifyOrDelete(targetUser)) {
+      toast.error('Action non autorisée')
+      return
+    }
     try {
-      const targetUser = users.find(u => u.id === userId)
-      
-      // Vérifier les permissions
-      if (!canModifyUserRole(currentUser?.email, targetUser?.email)) {
-        toast.error('Vous n\'avez pas les permissions pour modifier ce rôle')
-        return
-      }
-
-      // Vérifier si on essaie de créer un autre super admin
-      if (newRole === 'super_admin' && !isCurrentUserSuperAdmin) {
-        toast.error('Seul le Super Administrateur peut créer d\'autres Super Administrateurs')
-        return
-      }
-
       const userRef = doc(db, 'users', userId)
       await updateDoc(userRef, { role: newRole })
       setUsers(users.map(user => 
@@ -97,15 +90,12 @@ const DashBoardPage = () => {
   }
 
   const handleStatusChange = async (userId: string, isActive: boolean) => {
+    const targetUser = users.find(u => u.id === userId)
+    if (!targetUser || !canModifyOrDelete(targetUser)) {
+      toast.error('Action non autorisée')
+      return
+    }
     try {
-      const targetUser = users.find(u => u.id === userId)
-      
-      // Empêcher la désactivation du super admin
-      if (targetUser?.email === SUPER_ADMIN_EMAIL && !isActive) {
-        toast.error('Impossible de désactiver le Super Administrateur')
-        return
-      }
-
       const userRef = doc(db, 'users', userId)
       await updateDoc(userRef, { isActive })
       setUsers(users.map(user => 
@@ -119,15 +109,12 @@ const DashBoardPage = () => {
   }
 
   const handleDeleteUser = async (userId: string) => {
+    const targetUser = users.find(u => u.id === userId)
+    if (!targetUser || !canModifyOrDelete(targetUser)) {
+      toast.error('Action non autorisée')
+      return
+    }
     try {
-      const targetUser = users.find(u => u.id === userId)
-      
-      // Vérifier les permissions
-      if (!canDeleteUser(currentUser?.email, targetUser?.email)) {
-        toast.error('Vous n\'avez pas les permissions pour supprimer cet utilisateur')
-        return
-      }
-
       const userRef = doc(db, 'users', userId)
       await deleteDoc(userRef)
       setUsers(users.filter(user => user.id !== userId))
@@ -139,13 +126,10 @@ const DashBoardPage = () => {
   }
 
   const filteredUsers = users.filter(user => 
-    user.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.role?.toLowerCase().includes(searchQuery.toLowerCase())
+    user.role?.toLowerCase().includes(searchQuery.toLowerCase()))
   )
-
-  // Obtenir les rôles disponibles pour l'utilisateur actuel
-  const availableRoles = getAvailableRoles(currentUser?.email)
 
   if (loading) {
     return (
@@ -173,14 +157,9 @@ const DashBoardPage = () => {
   }
 
   const UserCard = ({ user }: { user: User }) => {
-    const isUserSuperAdmin = isSuperAdmin(user.email)
-    const canModifyRole = canModifyUserRole(currentUser?.email, user.email)
-    const canDelete = canDeleteUser(currentUser?.email, user.email)
-
+    const canEdit = canModifyOrDelete(user)
     return (
-      <Card className={`w-full hover:shadow-lg transition-shadow duration-200 overflow-hidden ${
-        isUserSuperAdmin ? 'ring-2 ring-yellow-500/20 bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20' : ''
-      }`}>
+      <Card className="w-full hover:shadow-lg transition-shadow duration-200 overflow-hidden">
         <CardContent className="p-6">
           <div className="flex items-center gap-4 mb-6">
             <Avatar className="h-16 w-16 border-2 border-primary/20">
@@ -190,7 +169,6 @@ const DashBoardPage = () => {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-lg truncate">{user.displayName || 'Non défini'}</h3>
-                {isUserSuperAdmin && <Crown className="h-4 w-4 text-yellow-500" />}
               </div>
               <p className="text-sm text-muted-foreground truncate">{user.email}</p>
             </div>
@@ -202,7 +180,6 @@ const DashBoardPage = () => {
                 <Badge variant={user.role === 'super_admin' ? 'default' : 'secondary'}>
                   {user.role || 'citizen'}
                 </Badge>
-                {isUserSuperAdmin && <Shield className="h-3 w-3 text-yellow-500" />}
               </div>
             </div>
             <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
@@ -210,7 +187,7 @@ const DashBoardPage = () => {
               <Switch
                 checked={user.isActive}
                 onCheckedChange={(checked) => handleStatusChange(user.id, checked)}
-                disabled={isUserSuperAdmin}
+                disabled={!canEdit}
               />
             </div>
             <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
@@ -229,22 +206,20 @@ const DashBoardPage = () => {
               <Select
                 defaultValue={user.role || 'citizen'}
                 onValueChange={(value: UserRole) => handleRoleChange(user.id, value)}
-                disabled={!canModifyRole}
+                disabled={!canEdit}
               >
-                <SelectTrigger className="w-full" disabled={!canModifyRole}>
-                  <SelectValue placeholder={canModifyRole ? "Changer le rôle" : "Rôle protégé"} />
+                <SelectTrigger className="w-full" disabled={!canEdit}>
+                  <SelectValue placeholder={canEdit ? "Changer le rôle" : "Rôle protégé"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableRoles.filter(role => role !== 'super_admin').map((role) => (
+                  {['municipal_rep', 'citizen'].map((role) => (
                     <SelectItem key={role} value={role}>
-                      {role === 'moderator' ? 'Modérateur' :
-                       role === 'municipal_rep' ? 'Représentant Municipal' :
-                       'Utilisateur'}
+                      {role === 'municipal_rep' ? 'Représentant Municipal' : 'Utilisateur'}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {canDelete ? (
+              {canEdit ? (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="sm" className="flex-1">
@@ -284,13 +259,11 @@ const DashBoardPage = () => {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex items-center gap-2">
-              <CardTitle>Gestion des Utilisateurs</CardTitle>
-              {isCurrentUserSuperAdmin && (
-                <Badge variant="default" className="flex items-center gap-1">
-                  <Crown className="h-3 w-3" />
-                  Super Admin
-                </Badge>
-              )}
+              <CardTitle>Gestion des Utilisateurs (Modération)</CardTitle>
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Shield className="h-3 w-3" />
+                Modérateur
+              </Badge>
             </div>
             <div className="flex items-center gap-4 w-full sm:w-auto">
               <div className="relative flex-1 sm:flex-none sm:w-64">
@@ -341,14 +314,9 @@ const DashBoardPage = () => {
                   </TableHeader>
                   <TableBody>
                     {filteredUsers.map((user) => {
-                      const isUserSuperAdmin = isSuperAdmin(user.email)
-                      const canModifyRole = canModifyUserRole(currentUser?.email, user.email)
-                      const canDelete = canDeleteUser(currentUser?.email, user.email)
-
+                      const canEdit = canModifyOrDelete(user)
                       return (
-                        <TableRow key={user.id} className={`hover:bg-muted/50 ${
-                          isUserSuperAdmin ? 'bg-yellow-50/50 dark:bg-yellow-950/20' : ''
-                        }`}>
+                        <TableRow key={user.id}>
                           <TableCell className="py-3">
                             <div className="flex items-center gap-3 min-w-0">
                               <Avatar className="h-10 w-10 flex-shrink-0">
@@ -358,7 +326,6 @@ const DashBoardPage = () => {
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   <p className="font-medium truncate">{user.displayName || 'Non défini'}</p>
-                                  {isUserSuperAdmin && <Crown className="h-3 w-3 text-yellow-500" />}
                                 </div>
                                 <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                               </div>
@@ -369,14 +336,13 @@ const DashBoardPage = () => {
                               <Badge variant={user.role === 'super_admin' ? 'default' : 'secondary'}>
                                 {user.role || 'citizen'}
                               </Badge>
-                              {isUserSuperAdmin && <Shield className="h-3 w-3 text-yellow-500" />}
                             </div>
                           </TableCell>
                           <TableCell>
                             <Switch
                               checked={user.isActive}
                               onCheckedChange={(checked) => handleStatusChange(user.id, checked)}
-                              disabled={isUserSuperAdmin}
+                              disabled={!canEdit}
                             />
                           </TableCell>
                           <TableCell>
@@ -389,25 +355,23 @@ const DashBoardPage = () => {
                               <Select
                                 defaultValue={user.role || 'citizen'}
                                 onValueChange={(value: UserRole) => handleRoleChange(user.id, value)}
-                                disabled={!canModifyRole}
+                                disabled={!canEdit}
                               >
-                                <SelectTrigger className="w-[140px]" disabled={!canModifyRole}>
-                                  <SelectValue placeholder={canModifyRole ? "Changer le rôle" : "Protégé"} />
+                                <SelectTrigger className="w-[140px]" disabled={!canEdit}>
+                                  <SelectValue placeholder={canEdit ? "Changer le rôle" : "Protégé"} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {availableRoles.filter(role => role !== 'super_admin').map((role) => (
+                                  {['municipal_rep', 'citizen'].map((role) => (
                                     <SelectItem key={role} value={role}>
-                                      {role === 'moderator' ? 'Modérateur' :
-                                       role === 'municipal_rep' ? 'Rep. Municipal' :
-                                       'Utilisateur'}
+                                      {role === 'municipal_rep' ? 'Représentant Municipal' : 'Utilisateur'}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
-                              {canDelete ? (
+                              {canEdit ? (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" size="sm">
+                                    <Button variant="destructive" size="sm" className="flex-1">
                                       Supprimer
                                     </Button>
                                   </AlertDialogTrigger>
@@ -427,7 +391,7 @@ const DashBoardPage = () => {
                                   </AlertDialogContent>
                                 </AlertDialog>
                               ) : (
-                                <Button variant="outline" size="sm" disabled>
+                                <Button variant="outline" size="sm" className="flex-1" disabled>
                                   Protégé
                                 </Button>
                               )}
@@ -447,4 +411,4 @@ const DashBoardPage = () => {
   )
 }
 
-export default DashBoardPage
+export default ModeratorPage 

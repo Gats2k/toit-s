@@ -6,6 +6,18 @@
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
+  --background: 250 100% 98%;        /* Bleu très clair */
+  --foreground: 222 47% 11%;         /* Bleu foncé */
+  --primary: 262 83% 58%;            /* Violet/Bleu */
+  --primary-foreground: 0 0% 100%;   /* Blanc */
+  --secondary: 220 14% 96%;          /* Gris très clair */
+  --muted-foreground: 215 20% 65%;   /* Gris moyen */
+  --border: 220 13% 91%;             /* Bordure grise */
+  --success: 142 76% 36%;            /* Vert */
+  --warning: 38 92% 50%;             /* Orange */
+  --info: 199 89% 48%;               /* Bleu info */
+  --gradient-primary: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(230 100% 69%) 100%);
+  --gradient-secondary: linear-gradient(135deg, hsl(220 14% 96%) 0%, hsl(0 0% 100%) 100%);
 }
 
 @media (prefers-color-scheme: dark) {

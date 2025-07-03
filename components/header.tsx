@@ -9,7 +9,6 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { auth, db } from '@/firebase/client';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -98,16 +97,26 @@ export function Header() {
     //   href: '/',
     //   icon: <MapPin size={18} />,
     // },
-    {
-      name: 'Map',
-      href: '/map',
-      icon: <MapIcon size={18} />,
-    },
-    ...(isSuperAdmin(userData?.email || firebaseUser?.email) ? [{
-      name: 'Admin',
-      href: '/admin',
-      icon: <Shield size={18} />,
-    }] : []),
+     {
+       name: 'Map',
+       href: '/map',
+       icon: <MapIcon size={18} />,
+     },
+     ...(
+       isSuperAdmin(userData?.email || firebaseUser?.email)
+         ? [{
+             name: 'Admin',
+             href: '/admin',
+             icon: <Shield size={18} />,
+           }]
+         : userData?.role === 'moderator'
+           ? [{
+               name: 'Modération',
+               href: '/moderator',
+               icon: <Shield size={18} />,
+             }]
+           : []
+     ),
   ];
 
   // Conditional nav items based on authentication
@@ -207,8 +216,6 @@ export function Header() {
               </>
             )}
           </nav>
-
-          <ThemeToggle />
 
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
